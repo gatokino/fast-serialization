@@ -93,18 +93,7 @@ public class FSTObjectOutputNoShared extends FSTObjectOutput {
                 return null;
             }
             final Class clazz = toWrite.getClass();
-            if ( clazz == String.class ) {
-                String[] oneOf = referencee.getOneOf();
-                if ( oneOf != null ) {
-                    for (int i = 0; i < oneOf.length; i++) {
-                        String s = oneOf[i];
-                        if ( s.equals(toWrite) ) {
-                            getCodec().writeTag(ONE_OF, oneOf, i, toWrite, this);
-                            getCodec().writeFByte(i);
-                            return null;
-                        }
-                    }
-                }
+            if ( clazz == String.class ) {            
                 if (dontShare) {
                     getCodec().writeTag(STRING, toWrite, 0, toWrite, this);
                     getCodec().writeStringUTF((String) toWrite);

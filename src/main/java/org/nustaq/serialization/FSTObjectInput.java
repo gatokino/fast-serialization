@@ -358,6 +358,9 @@ public class FSTObjectInput implements ObjectInput {
             clzSerInfo = getClazzInfo(c, referencee);
         } else if ( code >= 1 ) {
             try {
+            	if(referencee.getPossibleClasses()==null){
+            		System.out.println();            	
+            	}
                 c = referencee.getPossibleClasses()[code - 1];
                 clzSerInfo = getClazzInfo(c, referencee);
             } catch (Throwable th) {
@@ -401,7 +404,6 @@ public class FSTObjectInput implements ObjectInput {
                 case FSTObjectOutput.BIG_LONG: { return Long.valueOf(getCodec.readFLong()); }
                 case FSTObjectOutput.BIG_BOOLEAN_FALSE: { return Boolean.FALSE; }
                 case FSTObjectOutput.BIG_BOOLEAN_TRUE: { return Boolean.TRUE; }
-                case FSTObjectOutput.ONE_OF: { return referencee.getOneOf()[getCodec.readFByte()]; }
 //                case FSTObjectOutput.NULL: { return null; }
                 case FSTObjectOutput.DIRECT_ARRAY_OBJECT: {
                     Object directObject = getCodec.getDirectObject();
@@ -498,9 +500,7 @@ public class FSTObjectInput implements ObjectInput {
 	        	}
 	        }	        	        
 	        if ( REGISTER_ENUMS_READ ) {
-	            if ( ! referencee.isFlat() ) { // should be unnecessary
 	                objects.registerObjectForRead(res, readPos);
-	            }
 	        }
 	        return res;
         } else {
@@ -512,9 +512,7 @@ public class FSTObjectInput implements ObjectInput {
 	        }
 	        Object res = enumConstants[ordinal];
 	        if ( REGISTER_ENUMS_READ ) {
-	            if ( ! referencee.isFlat() ) { // should be unnecessary
 	                objects.registerObjectForRead(res, readPos);
-	            }
 	        }
 	        return res;
         }
@@ -546,7 +544,7 @@ public class FSTObjectInput implements ObjectInput {
                 c = newObj.getClass();
                 clzSerInfo = clInfoRegistry.getCLInfo(c, conf);
             }
-            if ( ! referencee.isFlat() && ! clzSerInfo.isFlat() && !ser.alwaysCopy()) {
+            if ( !ser.alwaysCopy()) {
                 objects.registerObjectForRead(newObj, readPos);
             }
             if ( !serInstance )
@@ -566,7 +564,7 @@ public class FSTObjectInput implements ObjectInput {
         //fixme: code below improves unshared decoding perf, however disables to run mixed mode (clients can decide)
         //actually would need 2 flags for encode/decode
         //tested with json mixed mode does not work anyway ...
-        final boolean needsRefLookup = conf.shareReferences && !referencee.isFlat() && !clzSerInfo.isFlat();
+        final boolean needsRefLookup = conf.shareReferences;
         // previously :
 //        final boolean needsRefLookup = !referencee.isFlat() && !clzSerInfo.isFlat();
         if (needsRefLookup) {
@@ -691,26 +689,12 @@ public class FSTObjectInput implements ObjectInput {
             version = 0;
         int booleanMask = 0;
         int boolcount = 8;
-        final int length = fieldInfo.length;
-        int conditional = 0;
+        final int length = fieldInfo.length;        
         byte[] storedSizeBuff = new byte[4];
         for (int i = startIndex; i < length; i++) {
             try {
                 FSTClazzInfo.FSTFieldInfo subInfo = fieldInfo[i];                                
                 //
-                if (subInfo.getVersion() > version ) {
-                    int nextVersion = getCodec.readVersionTag();
-                    if ( nextVersion == 0 ) // old object read
-                    {
-                        oldVersionRead(newObj);
-                        return;
-                    }
-                    if ( nextVersion != subInfo.getVersion() ) {
-                        throw new RuntimeException("read version tag "+nextVersion+" fieldInfo has "+subInfo.getVersion());
-                    }
-                    readObjectFields(referencee,serializationInfo,fieldInfo,newObj,i,nextVersion);
-                    return;
-                }
                 // ARC: read the size in case that we are
                 int storedSize = -1;
                 if(FSTConfiguration.FIELDS_FIX_LENGTH){                	
@@ -759,15 +743,6 @@ public class FSTObjectInput implements ObjectInput {
 	                        }
 	                    }
 	                } else {
-	                    if ( subInfo.isConditional() ) {
-	                        if ( conditional == 0 ) {
-	                            conditional = getCodec.readPlainInt();
-	                            if ( skipConditional(newObj, conditional, subInfo) ) {
-	                                getCodec.moveTo(conditional);
-	                                continue;
-	                            }
-	                        }
-	                    }
 	                    // object
 	                    Object subObject = readObjectWithHeader(subInfo);                    
 	                    subInfo.setObjectValue(newObj, subObject);                    
@@ -965,8 +940,7 @@ public class FSTObjectInput implements ObjectInput {
         Class arrType = arrCl.getComponentType();
         if (!arrType.isArray()) {
             Object array = Array.newInstance(arrType, len);
-            if ( ! referencee.isFlat() )
-                objects.registerObjectForRead(array, pos );
+            objects.registerObjectForRead(array, pos );
             if (arrType.isPrimitive()) {
                 return getCodec.readFPrimitiveArray(array, arrType, len);
             } else { // Object Array
@@ -981,9 +955,7 @@ public class FSTObjectInput implements ObjectInput {
             return array;
         } else { // multidim array
             Object array[] = (Object[]) Array.newInstance(arrType, len);
-            if ( ! referencee.isFlat() ) {
-                objects.registerObjectForRead(array, pos);
-            }
+            objects.registerObjectForRead(array, pos);            
             FSTClazzInfo.FSTFieldInfo ref1 = new FSTClazzInfo.FSTFieldInfo(referencee.getPossibleClasses(), null, clInfoRegistry.isIgnoreAnnotations());
             for (int i = 0; i < len; i++) {
                 Object subArray = readArray(ref1, -1);
@@ -994,7 +966,7 @@ public class FSTObjectInput implements ObjectInput {
     }
 
     public void registerObject(Object o, int streamPosition, FSTClazzInfo info, FSTClazzInfo.FSTFieldInfo referencee) {
-        if ( ! objects.disabled && !referencee.isFlat() && (info == null || ! info.isFlat() ) ) {
+        if ( ! objects.disabled ) {
             objects.registerObjectForRead(o, streamPosition);
         }
     }

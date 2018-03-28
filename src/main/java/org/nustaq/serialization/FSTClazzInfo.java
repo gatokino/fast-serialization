@@ -16,7 +16,6 @@
 package org.nustaq.serialization;
 
 import org.nustaq.offheap.structs.Align;
-import org.nustaq.serialization.annotations.*;
 import org.nustaq.serialization.util.FSTMap;
 import org.nustaq.serialization.util.FSTUtil;
 
@@ -53,10 +52,6 @@ public final class FSTClazzInfo {
         public int compare(FSTFieldInfo o1, FSTFieldInfo o2) {
             int res = 0;
 
-            if ( o1.getVersion() != o2.getVersion() ) {
-                return o1.getVersion() < o2.getVersion() ? -1 : 1;
-            }
-
             // order: version, boolean, primitives, conditionals, object references
             if (o1.getType() == boolean.class && o2.getType() != boolean.class) {
                 return -1;
@@ -65,16 +60,10 @@ public final class FSTClazzInfo {
                 return 1;
             }
 
-            if (o1.isConditional() && !o2.isConditional()) {
-                res = 1;
-            } else if (!o1.isConditional() && o2.isConditional()) {
-                res = -1;
-            } else if (o1.isPrimitive() && !o2.isPrimitive()) {
+            if (o1.isPrimitive() && !o2.isPrimitive()) {
                 res = -1;
             } else if (!o1.isPrimitive() && o2.isPrimitive())
                 res = 1;
-//                if (res == 0) // 64 bit / 32 bit issues
-//                    res = (int) (o1.getMemOffset() - o2.getMemOffset());
             if (res == 0)
                 res = o1.getType().getSimpleName().compareTo(o2.getType().getSimpleName());
             if (res == 0)
@@ -84,8 +73,7 @@ public final class FSTClazzInfo {
             }
             return res;
         }
-    };
-    Class[] predict;
+    };    
     private boolean ignoreAnn;
     FSTMap<String, FSTFieldInfo> fieldMap;
     Method writeReplaceMethod, readResolveMethod;
@@ -102,8 +90,7 @@ public final class FSTClazzInfo {
     }
 
     boolean requiresCompatibleMode;
-    boolean externalizable;
-    boolean flat; // never share instances of this class
+    boolean externalizable;    
     boolean isAsciiNameShortString = false;
     boolean requiresInit = false;
     boolean hasTransient;
@@ -154,13 +141,6 @@ public final class FSTClazzInfo {
             } else {
                 cons = instantiator.findConstructorForSerializable(clazz);
             }
-        }
-        if (!ignoreAnnotations) {
-            Predict annotation = (Predict) clazz.getAnnotation(Predict.class);
-            if (annotation != null) {
-                predict = annotation.value();
-            }
-            flat = clazz.isAnnotationPresent(Flat.class);
         }
 
         if (cons != null) {
@@ -227,14 +207,6 @@ public final class FSTClazzInfo {
         return externalizable;
     }
 
-    public final boolean isFlat() {
-        return flat;
-    }
-
-    public final Class[] getPredict() {
-        return predict;
-    }
-
     public final Object newInstance(boolean doesRequireInit) {
         return instantiator.newInstance(clazz, cons, doesRequireInit || requiresInit, conf.isForceSerializable() );
     }
@@ -289,14 +261,7 @@ public final class FSTClazzInfo {
     }
 
     private boolean isTransient(Class c, Field field) {
-        if (Modifier.isTransient(field.getModifiers()))
-            return true;
-        while (c.getName().indexOf("$") >= 0) {
-            c = c.getSuperclass(); // patch fuer reallive queries, kontraktor spore
-        }
-        if ( field.getName().startsWith("this$") && c.getAnnotation(AnonymousTransient.class) != null )
-            return true;
-        return (c.getAnnotation(Transient.class) != null && field.getAnnotation(Serialize.class) == null);
+        return Modifier.isTransient(field.getModifiers());
     }
 
     public final FSTFieldInfo[] getFieldInfo() {
@@ -555,8 +520,7 @@ public final class FSTClazzInfo {
             }
         }
         field.setAccessible(true);
-        Predict predict = crossPlatform ? null : field.getAnnotation(Predict.class); // needs to be iognored cross platform
-        FSTFieldInfo result = new FSTFieldInfo(predict != null ? predict.value() : null, field, ignoreAnn);
+        FSTFieldInfo result = new FSTFieldInfo(null, field, ignoreAnn);
         if ( conf.fieldInfoCache != null && key != null ) {
             conf.fieldInfoCache.put(key,result);
         }
@@ -599,19 +563,16 @@ public final class FSTClazzInfo {
 
         Class possibleClasses[];
         FSTClazzInfo lastInfo; // cache last class stored (can save a hash lookup)
-        String oneOf[] = null;
 
         int arrayDim;
         Class arrayType;
-        boolean flat = false;
-        boolean isConditional = false;
+                
 
         final Field field;
         Class type;
         boolean integral = false;
         boolean primitive = false;
         boolean isArr = false;
-        byte version;
         int integralType;
         long memOffset = -1;
         boolean isAndroid = FSTConfiguration.isAndroid; // hope for better locality
@@ -687,24 +648,8 @@ public final class FSTClazzInfo {
                 arrayType = calcComponentType(field.getType());
             }
             calcIntegral();
-            if (fi != null && !ignoreAnnotations) {
-                version = (byte) (fi.isAnnotationPresent(Version.class) ? fi.getAnnotation(Version.class).value() : 0);
-                flat = fi.isAnnotationPresent(Flat.class);
-                isConditional = fi.isAnnotationPresent(Conditional.class);
-                if (isIntegral()) {
-                    isConditional = false;
-                }
-                OneOf annotation = fi.getAnnotation(OneOf.class);
-                if (annotation != null) {
-                    oneOf = annotation.value();
-                }
-            }
-
         }
 
-        public byte getVersion() {
-            return version;
-        }
 
         public Object getBufferedName() {
             return bufferedName;
@@ -732,10 +677,6 @@ public final class FSTClazzInfo {
             this.structOffset = structOffset;
         }
 
-        public String[] getOneOf() {
-            return oneOf;
-        }
-
         public long getMemOffset() {
             return memOffset;
         }
@@ -746,10 +687,6 @@ public final class FSTClazzInfo {
 
         public int getAlignPad() {
             return alignPad;
-        }
-
-        public boolean isConditional() {
-            return isConditional;
         }
 
         public FSTClazzInfo getLastInfo() {
@@ -861,11 +798,7 @@ public final class FSTClazzInfo {
         public String toString() {
             return getDesc();
         }
-
-        public boolean isFlat() {
-            return flat;
-        }
-
+       
         public int getComponentStructSize() {
             if (arrayType == boolean.class || arrayType == byte.class)
                 return 1;

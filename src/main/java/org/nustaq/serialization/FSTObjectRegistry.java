@@ -134,12 +134,12 @@ public final class FSTObjectRegistry {
         }
 //        System.out.println("REGISTER AT WRITE:"+streamPosition+" "+o.getClass().getSimpleName());
 //        final Class clazz = o.getClass();
-        if ( clzInfo == null ) { // array oder enum oder primitive
+//        if ( clzInfo == null ) { // array oder enum oder primitive
             // unused ?
 //            clzInfo = reg.getCLInfo(clazz);
-        } else if ( clzInfo.isFlat() ) {
-            return Integer.MIN_VALUE;
-        }
+//        } else if ( clzInfo.isFlat() ) {
+//            return Integer.MIN_VALUE;
+//        }
         int handle = objects.putOrGet(o,streamPosition);
         if ( handle >= 0 ) {
 //            if ( idToObject.get(handle) == null ) { // (*) (can get improved)

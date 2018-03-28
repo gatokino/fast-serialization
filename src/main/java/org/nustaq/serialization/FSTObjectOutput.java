@@ -385,17 +385,6 @@ public class FSTObjectOutput implements ObjectOutput {
             objectWillBeWritten(toWrite, startPosition);
             final Class clazz = toWrite.getClass();
             if ( clazz == String.class ) {
-                String[] oneOf = referencee.getOneOf();
-                if ( oneOf != null ) {
-                    for (int i = 0; i < oneOf.length; i++) {
-                        String s = oneOf[i];
-                        if ( s.equals(toWrite) ) {
-                            getCodec.writeTag(ONE_OF, oneOf, i, toWrite, this);
-                            getCodec.writeFByte(i);
-                            return null;
-                        }
-                    }
-                }
                 // shortpath
                 if (! dontShare && writeHandleIfApplicable(toWrite, stringInfo))
                     return stringInfo;
@@ -420,7 +409,7 @@ public class FSTObjectOutput implements ObjectOutput {
 
             // check for identical / equal objects
             FSTObjectSerializer ser = serializationInfo.getSer();
-            if ( ! dontShare && ! referencee.isFlat() && ! serializationInfo.isFlat() && ( ser == null || !ser.alwaysCopy() ) ) {
+            if ( ! dontShare && ( ser == null || !ser.alwaysCopy() ) ) {
                 if (writeHandleIfApplicable(toWrite, serializationInfo))
                     return serializationInfo;
             }
@@ -600,7 +589,7 @@ public class FSTObjectOutput implements ObjectOutput {
             int j = startIndex;
             if ( ! getCodec.isWritingAttributes() && !FSTConfiguration.FIELDS_FIX_LENGTH ) { // pack bools into bits in case it's not a chatty codec
                 for (;; j++) {
-                    if ( j == length || fieldInfo[j].getVersion() != version ) {
+                    if ( j == length ) {
                         if ( boolcount > 0 ) {
                             getCodec.writeFByte(booleanMask << (8 - boolcount));
                         }
@@ -626,12 +615,7 @@ public class FSTObjectOutput implements ObjectOutput {
             }
             for (int i = j; i < length; i++)
             {
-                final FSTClazzInfo.FSTFieldInfo subInfo = fieldInfo[i];
-                if (subInfo.getVersion() != version ) {
-                    getCodec.writeVersionTag(subInfo.getVersion());
-                    writeObjectFields(toWrite, serializationInfo, fieldInfo, i, subInfo.getVersion());
-                    return;
-                }
+                final FSTClazzInfo.FSTFieldInfo subInfo = fieldInfo[i];                
                 if ( getCodec.writeAttributeName(subInfo, toWrite) ) {
                     continue;
                 }                
@@ -667,19 +651,6 @@ public class FSTObjectOutput implements ObjectOutput {
                         case FSTClazzInfo.FSTFieldInfo.DOUBLE:
                             getCodec.writeFDouble(subInfo.getDoubleValue(toWrite)); break;
                     }
-                } else if (subInfo.isConditional())
-                {
-                    final int conditional = getCodec.getWritten();
-                    getCodec.skip(4);
-                    // object
-                    Object subObject = subInfo.getObjectValue(toWrite);
-                    if ( subObject == null ) {
-                        getCodec.writeTag(NULL, null, 0, toWrite, this);
-                    } else {
-                        writeObjectWithContext(subInfo, subObject);
-                    }
-                    int v = getCodec.getWritten();                    
-                    getCodec.writeInt32At(conditional, v);
                 } else {
                     // object
                     Object subObject = subInfo.getObjectValue(toWrite);
@@ -796,7 +767,7 @@ public class FSTObjectOutput implements ObjectOutput {
      */
     protected boolean writeObjectHeader(final FSTClazzInfo clsInfo, final FSTClazzInfo.FSTFieldInfo referencee, final Object toWrite) throws IOException {
     	final FSTEncoder getCodec = getCodec();
-        if ( toWrite.getClass() == referencee.getType()
+        if ( false && toWrite.getClass() == referencee.getType()
                 && ! clsInfo.useCompatibleMode() )
         {
             return getCodec.writeTag(TYPED, clsInfo, 0, toWrite, this);

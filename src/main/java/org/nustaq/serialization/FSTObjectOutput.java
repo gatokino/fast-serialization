@@ -767,11 +767,11 @@ public class FSTObjectOutput implements ObjectOutput {
      */
     protected boolean writeObjectHeader(final FSTClazzInfo clsInfo, final FSTClazzInfo.FSTFieldInfo referencee, final Object toWrite) throws IOException {
     	final FSTEncoder getCodec = getCodec();
-        if ( false && toWrite.getClass() == referencee.getType()
-                && ! clsInfo.useCompatibleMode() )
-        {
-            return getCodec.writeTag(TYPED, clsInfo, 0, toWrite, this);
-        } else {
+//        if ( toWrite.getClass() == referencee.getType()
+//                && ! clsInfo.useCompatibleMode() )
+//        {
+//            return getCodec.writeTag(TYPED, clsInfo, 0, toWrite, this);
+//        } else {
             final Class[] possibleClasses = referencee.getPossibleClasses();
             if ( possibleClasses == null ) {
                 if ( !getCodec.writeTag(OBJECT, clsInfo, 0, toWrite, this) ) {
@@ -796,7 +796,7 @@ public class FSTObjectOutput implements ObjectOutput {
                     return true;
                 }
             }
-        }
+//        }
     }
 
     // incoming array is already registered
